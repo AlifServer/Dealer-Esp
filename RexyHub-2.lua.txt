@@ -1,0 +1,1235 @@
+-- ██████╗ ███████╗██╗  ██╗██╗   ██╗    ██╗  ██╗██╗   ██╗██████╗ 
+-- ██╔══██╗██╔════╝╚██╗██╔╝╚██╗ ██╔╝    ██║  ██║██║   ██║██╔══██╗
+-- ██████╔╝█████╗   ╚███╔╝  ╚████╔╝     ███████║██║   ██║██████╔╝
+-- ██╔══██╗██╔══╝   ██╔██╗   ╚██╔╝      ██╔══██║██║   ██║██╔══██╗
+-- ██║  ██║███████╗██╔╝ ██╗   ██║       ██║  ██║╚██████╔╝██████╔╝
+-- ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝   ╚═╝       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ 
+-- Rexy Hub v1.0 | Blox Fruits | Delta Compatible
+
+-- ============================================================
+--  SERVICES
+-- ============================================================
+local Players         = game:GetService("Players")
+local RunService      = game:GetService("RunService")
+local TweenService    = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace       = game:GetService("Workspace")
+local LocalPlayer     = Players.LocalPlayer
+local Camera          = Workspace.CurrentCamera
+
+-- ============================================================
+--  SCREEN / DEVICE DETECTION
+-- ============================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name             = "RexyHub"
+ScreenGui.ResetOnSpawn     = false
+ScreenGui.ZIndexBehavior   = Enum.ZIndexBehavior.Sibling
+ScreenGui.IgnoreGuiInset   = true
+ScreenGui.DisplayOrder     = 999
+
+if syn and syn.protect_gui then
+    syn.protect_gui(ScreenGui)
+    ScreenGui.Parent = game:GetService("CoreGui")
+elseif gethui then
+    ScreenGui.Parent = gethui()
+else
+    ScreenGui.Parent = game:GetService("CoreGui")
+end
+
+local VP          = Camera.ViewportSize
+local IS_MOBILE   = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+-- ============================================================
+--  COLOURS & THEME
+-- ============================================================
+local C = {
+    BG        = Color3.fromRGB(10,  10,  15),
+    BG2       = Color3.fromRGB(18,  18,  25),
+    BG3       = Color3.fromRGB(25,  25,  35),
+    ACCENT    = Color3.fromRGB(120, 60,  255),
+    ACCENT2   = Color3.fromRGB(80,  200, 255),
+    TEXT      = Color3.fromRGB(230, 230, 240),
+    SUBTEXT   = Color3.fromRGB(140, 140, 160),
+    RED       = Color3.fromRGB(255, 70,  70),
+    GREEN     = Color3.fromRGB(60,  220, 120),
+    BORDER    = Color3.fromRGB(50,  50,  70),
+    WHITE     = Color3.fromRGB(255, 255, 255),
+    TRANS     = Color3.fromRGB(0,   0,   0),
+}
+
+-- ============================================================
+--  STATE
+-- ============================================================
+local State = {
+    UIVisible         = true,
+    CurrentTab        = "Main",
+    -- Main toggles
+    TweenToBerry      = false,
+    CollectBerry      = false,
+    TpSwordDealer     = false,
+    -- ESP toggles
+    EspBerry          = false,
+    EspSwordDealer    = false,
+    -- Selected berry (nil = closest)
+    SelectedBerry     = nil,
+    -- Selected island
+    SelectedIsland    = nil,
+    -- Tween speed
+    TweenSpeed        = 350,
+    -- ESP labels
+    EspLabels         = {},
+    -- Sword dealer esp labels
+    DealerEspLabels   = {},
+}
+
+-- ============================================================
+--  BERRY DATA
+-- ============================================================
+local BERRY_NAMES = {
+    "Blue Icicle Berry",
+    "Green Toad Berry",
+    "Orange Berry",
+    "Pink Pig Berry",
+    "Purple Jelly Berry",
+    "Red Cherry Berry",
+    "White Cloud Berry",
+    "Yellow Star Berry",
+}
+
+-- ============================================================
+--  ISLAND COORDINATES
+-- ============================================================
+local SEA2_ISLANDS = {
+    ["Kingdom of Rose"]  = Vector3.new(-267,  73,  -576),
+    ["Green Zone"]        = Vector3.new(309,   104, -1702),
+    ["Graveyard"]         = Vector3.new(1025,  53,  -450),
+    ["Snow Mountain"]     = Vector3.new(1291,  271, 278),
+    ["Hot and Cold"]      = Vector3.new(-1147, 7,   779),
+    ["Cursed Ship"]       = Vector3.new(775,   8,   868),
+    ["Ice Castle"]        = Vector3.new(-1384, 183, 422),
+    ["Forgotten Island"]  = Vector3.new(-1119, 35,  -750),
+    ["Remote Island"]     = Vector3.new(-879,  10,  -1460),
+    ["Cafe"]              = Vector3.new(-167,  74,  -580),
+    ["Dark Arena"]        = Vector3.new(-1200, 15,  950),
+}
+
+local SEA3_ISLANDS = {
+    ["Port Town"]         = Vector3.new(640,   15,  -1300),
+    ["Hydra Island"]      = Vector3.new(-3600, 50,  -2800),
+    ["Great Tree"]        = Vector3.new(5500,  400, 4200),
+    ["Floating Turtle"]   = Vector3.new(-6100, 530, -2200),
+    ["Haunted Castle"]    = Vector3.new(-7600, 60,  3600),
+    ["Sea of Treats"]     = Vector3.new(4300,  20,  -5800),
+    ["Tiki Outpost"]      = Vector3.new(3300,  15,  -1800),
+    ["Castle on the Sea"] = Vector3.new(-1700, 15,  -3200),
+}
+
+-- ============================================================
+--  SWORD DEALER SPAWN LOCATIONS (Second Sea)
+-- ============================================================
+local DEALER_SPAWNS = {
+    Vector3.new(-267,  85,  -516),   -- Kingdom of Rose waterway
+    Vector3.new(-183,  73,  -580),   -- Colosseum northeast arches
+    Vector3.new(309,   150, -1702),  -- Green Zone beanstalk top
+    Vector3.new(380,   115, -1760),  -- Green Zone Fajita grassy rock
+    Vector3.new(450,   110, -1650),  -- Kingdom of Rose Factory plateau
+    Vector3.new(1025,  130, -450),   -- Graveyard central pillar top
+    Vector3.new(-879,  20,  -1460),  -- Remote Island / Usoapp center house
+}
+
+-- ============================================================
+--  UTILITY FUNCTIONS
+-- ============================================================
+local function Tween(obj, props, t)
+    TweenService:Create(obj, TweenInfo.new(t or 0.25, Enum.EasingStyle.Quad), props):Play()
+end
+
+local function GetCharacter()
+    return LocalPlayer.Character
+end
+
+local function GetHRP()
+    local c = GetCharacter()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function TweenToPosition(pos)
+    local hrp = GetHRP()
+    if not hrp then return end
+    local dist   = (hrp.Position - pos).Magnitude
+    local time   = dist / State.TweenSpeed
+    TweenService:Create(hrp, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = CFrame.new(pos + Vector3.new(0,3,0))}):Play()
+end
+
+local function WorldToViewport(pos)
+    local vp, vis = Camera:WorldToViewportPoint(pos)
+    return Vector2.new(vp.X, vp.Y), vis, vp.Z
+end
+
+-- ============================================================
+--  FIND BERRIES IN WORKSPACE
+-- ============================================================
+local function FindBerries(filterName)
+    local found = {}
+    local hrp   = GetHRP()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        local matched = false
+        for _, name in ipairs(BERRY_NAMES) do
+            if obj.Name:find(name, 1, true) or (obj:IsA("Model") and obj.Name:find("Berry")) then
+                if filterName then
+                    if obj.Name:find(filterName, 1, true) then matched = true end
+                else
+                    matched = true
+                end
+                break
+            end
+        end
+        if matched and obj:IsA("BasePart") then
+            table.insert(found, obj)
+        end
+    end
+    -- Sort by distance if hrp exists
+    if hrp then
+        table.sort(found, function(a, b)
+            return (a.Position - hrp.Position).Magnitude < (b.Position - hrp.Position).Magnitude
+        end)
+    end
+    return found
+end
+
+local function FindBerryModels(filterName)
+    local found = {}
+    local hrp   = GetHRP()
+    local seen  = {}
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj:IsA("Model") and not seen[obj] then
+            local nameMatch = false
+            for _, bname in ipairs(BERRY_NAMES) do
+                if obj.Name:find(bname, 1, true) then
+                    if filterName then
+                        if obj.Name:find(filterName, 1, true) then nameMatch = true end
+                    else
+                        nameMatch = true
+                    end
+                    break
+                end
+            end
+            if nameMatch then
+                seen[obj] = true
+                local root = obj:FindFirstChild("Handle") or obj:FindFirstChildWhichIsA("BasePart")
+                if root then
+                    table.insert(found, {model = obj, part = root})
+                end
+            end
+        end
+    end
+    if hrp then
+        table.sort(found, function(a,b)
+            return (a.part.Position - hrp.Position).Magnitude < (b.part.Position - hrp.Position).Magnitude
+        end)
+    end
+    return found
+end
+
+-- ============================================================
+--  FIND SWORD DEALER
+-- ============================================================
+local function FindSwordDealer()
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        if obj.Name == "Legendary Sword Dealer" and obj:IsA("Model") then
+            return obj
+        end
+    end
+    return nil
+end
+
+-- ============================================================
+--  GET BERRIES PRESENT IN SERVER
+-- ============================================================
+local function GetPresentBerryTypes()
+    local types = {}
+    local seen  = {}
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+        for _, bname in ipairs(BERRY_NAMES) do
+            if not seen[bname] and obj.Name:find(bname, 1, true) then
+                seen[bname] = true
+                table.insert(types, bname)
+            end
+        end
+    end
+    return types
+end
+
+-- ============================================================
+--  DETECT SEA
+-- ============================================================
+local function GetCurrentSea()
+    -- Basic heuristic: check map name or player location
+    -- Returns 2 or 3
+    local mapFolder = Workspace:FindFirstChild("Map") or Workspace:FindFirstChild("Seawater")
+    if mapFolder then
+        -- If third sea islands exist in workspace descendants
+        if Workspace:FindFirstChild("Floating Turtle") or Workspace:FindFirstChild("FloatingTurtle") then
+            return 3
+        end
+    end
+    -- Fallback based on HRP position
+    local hrp = GetHRP()
+    if hrp and hrp.Position.Y > 200 then return 3 end
+    -- Default second sea
+    return 2
+end
+
+-- ============================================================
+--  BUILD GUI
+-- ============================================================
+
+-- Sizes
+local UIW  = math.floor(VP.X * 0.45)
+local UIH  = math.floor(VP.Y * 0.72)
+UIW = math.max(UIW, 280)
+UIH = math.max(UIH, 400)
+
+-- Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name            = "MainFrame"
+MainFrame.Size            = UDim2.new(0, UIW, 0, UIH)
+MainFrame.Position        = UDim2.new(0.27, 0, 0.14, 0)
+MainFrame.BackgroundColor3 = C.BG
+MainFrame.BackgroundTransparency = 0.08
+MainFrame.BorderSizePixel = 0
+MainFrame.ClipsDescendants = true
+MainFrame.Parent          = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 14)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color     = C.ACCENT
+MainStroke.Thickness = 1.5
+MainStroke.Transparency = 0.4
+MainStroke.Parent = MainFrame
+
+-- Gradient overlay
+local Grad = Instance.new("UIGradient")
+Grad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(18, 10, 40)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10, 10, 18)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(10, 18, 30)),
+})
+Grad.Rotation = 135
+Grad.Parent = MainFrame
+
+-- ---- TITLE BAR ----
+local TitleBar = Instance.new("Frame")
+TitleBar.Size             = UDim2.new(1, 0, 0, 44)
+TitleBar.BackgroundColor3 = C.BG2
+TitleBar.BackgroundTransparency = 0.2
+TitleBar.BorderSizePixel  = 0
+TitleBar.ZIndex           = 3
+TitleBar.Parent           = MainFrame
+
+local TBarCorner = Instance.new("UICorner")
+TBarCorner.CornerRadius = UDim.new(0, 14)
+TBarCorner.Parent = TitleBar
+
+-- Bottom edge of title bar (square so it connects)
+local TBarFix = Instance.new("Frame")
+TBarFix.Size             = UDim2.new(1, 0, 0, 14)
+TBarFix.Position         = UDim2.new(0, 0, 1, -14)
+TBarFix.BackgroundColor3 = C.BG2
+TBarFix.BackgroundTransparency = 0.2
+TBarFix.BorderSizePixel  = 0
+TBarFix.ZIndex           = 3
+TBarFix.Parent           = TitleBar
+
+-- Accent line under title bar
+local AccentLine = Instance.new("Frame")
+AccentLine.Size             = UDim2.new(0.7, 0, 0, 2)
+AccentLine.Position         = UDim2.new(0.15, 0, 1, -1)
+AccentLine.BackgroundColor3 = C.ACCENT
+AccentLine.BorderSizePixel  = 0
+AccentLine.ZIndex           = 4
+AccentLine.Parent           = TitleBar
+
+local AccGrad = Instance.new("UIGradient")
+AccGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.new(0,0,0)),
+    ColorSequenceKeypoint.new(0.4, C.ACCENT),
+    ColorSequenceKeypoint.new(0.6, C.ACCENT2),
+    ColorSequenceKeypoint.new(1,   Color3.new(0,0,0)),
+})
+AccGrad.Parent = AccentLine
+
+-- Title Label
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size               = UDim2.new(1, -90, 1, 0)
+TitleLabel.Position           = UDim2.new(0, 14, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text               = "⚡ Rexy Hub"
+TitleLabel.Font               = Enum.Font.GothamBold
+TitleLabel.TextSize           = 17
+TitleLabel.TextColor3         = C.WHITE
+TitleLabel.TextXAlignment     = Enum.TextXAlignment.Left
+TitleLabel.ZIndex             = 4
+TitleLabel.Parent             = TitleBar
+
+-- Version badge
+local VerLabel = Instance.new("TextLabel")
+VerLabel.Size                 = UDim2.new(0, 40, 0, 18)
+VerLabel.Position             = UDim2.new(0, 115, 0.5, -9)
+VerLabel.BackgroundColor3     = C.ACCENT
+VerLabel.BackgroundTransparency = 0.4
+VerLabel.Text                 = "v1.0"
+VerLabel.Font                 = Enum.Font.GothamBold
+VerLabel.TextSize             = 10
+VerLabel.TextColor3           = C.WHITE
+VerLabel.ZIndex               = 5
+VerLabel.Parent               = TitleBar
+local VCorner = Instance.new("UICorner"); VCorner.CornerRadius = UDim.new(1,0); VCorner.Parent = VerLabel
+
+-- Minimize Button (-)
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size                = UDim2.new(0, 32, 0, 32)
+MinBtn.Position            = UDim2.new(1, -74, 0.5, -16)
+MinBtn.BackgroundColor3    = C.BG3
+MinBtn.BackgroundTransparency = 0.3
+MinBtn.Text                = "−"
+MinBtn.Font                = Enum.Font.GothamBold
+MinBtn.TextSize            = 22
+MinBtn.TextColor3          = C.TEXT
+MinBtn.BorderSizePixel     = 0
+MinBtn.ZIndex              = 5
+MinBtn.Parent              = TitleBar
+local MCorner = Instance.new("UICorner"); MCorner.CornerRadius = UDim.new(0,8); MCorner.Parent = MinBtn
+
+-- Close Button (X)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size              = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position          = UDim2.new(1, -38, 0.5, -16)
+CloseBtn.BackgroundColor3  = C.RED
+CloseBtn.BackgroundTransparency = 0.3
+CloseBtn.Text              = "✕"
+CloseBtn.Font              = Enum.Font.GothamBold
+CloseBtn.TextSize          = 18
+CloseBtn.TextColor3        = C.WHITE
+CloseBtn.BorderSizePixel   = 0
+CloseBtn.ZIndex            = 5
+CloseBtn.Parent            = TitleBar
+local XCorner = Instance.new("UICorner"); XCorner.CornerRadius = UDim.new(0,8); XCorner.Parent = CloseBtn
+
+-- ---- WARNING POPUP ----
+local WarnPopup = Instance.new("Frame")
+WarnPopup.Name             = "WarnPopup"
+WarnPopup.Size             = UDim2.new(0.88, 0, 0, 160)
+WarnPopup.Position         = UDim2.new(0.06, 0, 0.5, -80)
+WarnPopup.BackgroundColor3 = Color3.fromRGB(20, 10, 10)
+WarnPopup.BackgroundTransparency = 0.05
+WarnPopup.BorderSizePixel  = 0
+WarnPopup.ZIndex           = 20
+WarnPopup.Visible          = false
+WarnPopup.Parent           = MainFrame
+
+local WCorner = Instance.new("UICorner"); WCorner.CornerRadius = UDim.new(0,14); WCorner.Parent = WarnPopup
+local WStroke = Instance.new("UIStroke"); WStroke.Color = C.RED; WStroke.Thickness = 2; WStroke.Parent = WarnPopup
+
+local WarnIcon = Instance.new("TextLabel")
+WarnIcon.Size              = UDim2.new(1, 0, 0, 40)
+WarnIcon.Position          = UDim2.new(0, 0, 0, 10)
+WarnIcon.BackgroundTransparency = 1
+WarnIcon.Text              = "⚠️ WARNING"
+WarnIcon.Font              = Enum.Font.GothamBold
+WarnIcon.TextSize          = 20
+WarnIcon.TextColor3        = C.RED
+WarnIcon.ZIndex            = 21
+WarnIcon.Parent            = WarnPopup
+
+local WarnText = Instance.new("TextLabel")
+WarnText.Size              = UDim2.new(1, -20, 0, 40)
+WarnText.Position          = UDim2.new(0, 10, 0, 52)
+WarnText.BackgroundTransparency = 1
+WarnText.Text              = "Are you sure you want to\nclose Rexy Hub?"
+WarnText.Font              = Enum.Font.Gotham
+WarnText.TextSize          = 14
+WarnText.TextColor3        = C.TEXT
+WarnText.TextWrapped       = true
+WarnText.ZIndex            = 21
+WarnText.Parent            = WarnPopup
+
+local WarnYes = Instance.new("TextButton")
+WarnYes.Size               = UDim2.new(0.44, 0, 0, 34)
+WarnYes.Position           = UDim2.new(0.04, 0, 1, -44)
+WarnYes.BackgroundColor3   = C.RED
+WarnYes.Text               = "Yes, Close"
+WarnYes.Font               = Enum.Font.GothamBold
+WarnYes.TextSize            = 13
+WarnYes.TextColor3         = C.WHITE
+WarnYes.BorderSizePixel    = 0
+WarnYes.ZIndex             = 22
+WarnYes.Parent             = WarnPopup
+local WYC = Instance.new("UICorner"); WYC.CornerRadius = UDim.new(0,8); WYC.Parent = WarnYes
+
+local WarnNo = Instance.new("TextButton")
+WarnNo.Size                = UDim2.new(0.44, 0, 0, 34)
+WarnNo.Position            = UDim2.new(0.52, 0, 1, -44)
+WarnNo.BackgroundColor3    = C.BG3
+WarnNo.Text                = "Cancel"
+WarnNo.Font                = Enum.Font.GothamBold
+WarnNo.TextSize            = 13
+WarnNo.TextColor3          = C.TEXT
+WarnNo.BorderSizePixel     = 0
+WarnNo.ZIndex              = 22
+WarnNo.Parent              = WarnPopup
+local WNC = Instance.new("UICorner"); WNC.CornerRadius = UDim.new(0,8); WNC.Parent = WarnNo
+
+-- ---- TAB BAR ----
+local TabBar = Instance.new("Frame")
+TabBar.Size             = UDim2.new(1, -16, 0, 36)
+TabBar.Position         = UDim2.new(0, 8, 0, 50)
+TabBar.BackgroundColor3 = C.BG3
+TabBar.BackgroundTransparency = 0.2
+TabBar.BorderSizePixel  = 0
+TabBar.ZIndex           = 3
+TabBar.Parent           = MainFrame
+local TBCorner = Instance.new("UICorner"); TBCorner.CornerRadius = UDim.new(0,10); TBCorner.Parent = TabBar
+
+local TabLayout = Instance.new("UIListLayout")
+TabLayout.FillDirection = Enum.FillDirection.Horizontal
+TabLayout.SortOrder     = Enum.SortOrder.LayoutOrder
+TabLayout.Padding       = UDim.new(0,4)
+TabLayout.Parent        = TabBar
+
+local UIPad2 = Instance.new("UIPadding")
+UIPad2.PaddingLeft = UDim.new(0,4)
+UIPad2.PaddingRight = UDim.new(0,4)
+UIPad2.PaddingTop = UDim.new(0,4)
+UIPad2.PaddingBottom = UDim.new(0,4)
+UIPad2.Parent = TabBar
+
+local function MakeTabButton(name, order)
+    local btn = Instance.new("TextButton")
+    btn.Name            = name.."Tab"
+    btn.Size            = UDim2.new(0.5, -4, 1, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(30,30,45)
+    btn.BackgroundTransparency = 0.3
+    btn.Text            = name
+    btn.Font            = Enum.Font.GothamBold
+    btn.TextSize        = 13
+    btn.TextColor3      = C.SUBTEXT
+    btn.BorderSizePixel = 0
+    btn.LayoutOrder     = order
+    btn.ZIndex          = 4
+    btn.Parent          = TabBar
+    local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0,8); c.Parent = btn
+    return btn
+end
+
+local TabMain = MakeTabButton("Main", 1)
+local TabEsp  = MakeTabButton("Esp",  2)
+
+local function SetActiveTab(name)
+    State.CurrentTab = name
+    if name == "Main" then
+        TabMain.BackgroundColor3 = C.ACCENT
+        TabMain.BackgroundTransparency = 0.2
+        TabMain.TextColor3 = C.WHITE
+        TabEsp.BackgroundColor3 = Color3.fromRGB(30,30,45)
+        TabEsp.BackgroundTransparency = 0.3
+        TabEsp.TextColor3 = C.SUBTEXT
+    else
+        TabEsp.BackgroundColor3 = C.ACCENT
+        TabEsp.BackgroundTransparency = 0.2
+        TabEsp.TextColor3 = C.WHITE
+        TabMain.BackgroundColor3 = Color3.fromRGB(30,30,45)
+        TabMain.BackgroundTransparency = 0.3
+        TabMain.TextColor3 = C.SUBTEXT
+    end
+end
+
+-- ---- SCROLL CONTENT AREA ----
+local ContentScroll = Instance.new("ScrollingFrame")
+ContentScroll.Name              = "ContentScroll"
+ContentScroll.Size              = UDim2.new(1, -8, 1, -96)
+ContentScroll.Position          = UDim2.new(0, 4, 0, 92)
+ContentScroll.BackgroundTransparency = 1
+ContentScroll.BorderSizePixel   = 0
+ContentScroll.ScrollBarThickness = 3
+ContentScroll.ScrollBarImageColor3 = C.ACCENT
+ContentScroll.CanvasSize        = UDim2.new(0,0,0,0)
+ContentScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+ContentScroll.ZIndex            = 2
+ContentScroll.Parent            = MainFrame
+
+local ContentList = Instance.new("UIListLayout")
+ContentList.SortOrder = Enum.SortOrder.LayoutOrder
+ContentList.Padding   = UDim.new(0, 6)
+ContentList.Parent    = ContentScroll
+
+local ContentPad = Instance.new("UIPadding")
+ContentPad.PaddingLeft   = UDim.new(0,6)
+ContentPad.PaddingRight  = UDim.new(0,6)
+ContentPad.PaddingTop    = UDim.new(0,4)
+ContentPad.PaddingBottom = UDim.new(0,8)
+ContentPad.Parent        = ContentScroll
+
+-- ============================================================
+--  UI COMPONENT BUILDERS
+-- ============================================================
+
+local function MakeSeparator(text)
+    local sep = Instance.new("Frame")
+    sep.Name             = "Sep_"..text
+    sep.Size             = UDim2.new(1, 0, 0, 26)
+    sep.BackgroundTransparency = 1
+    sep.BorderSizePixel  = 0
+    sep.ZIndex           = 3
+    sep.Parent           = ContentScroll
+
+    local line = Instance.new("Frame")
+    line.Size            = UDim2.new(1, 0, 0, 1)
+    line.Position        = UDim2.new(0, 0, 0.5, 0)
+    line.BackgroundColor3 = C.BORDER
+    line.BorderSizePixel = 0
+    line.ZIndex          = 3
+    line.Parent          = sep
+
+    if text ~= "" then
+        local lbl = Instance.new("TextLabel")
+        lbl.Size             = UDim2.new(0, 0, 1, 0)
+        lbl.AutomaticSize    = Enum.AutomaticSize.X
+        lbl.Position         = UDim2.new(0.5, 0, 0, 0)
+        lbl.AnchorPoint      = Vector2.new(0.5, 0)
+        lbl.BackgroundColor3 = C.BG
+        lbl.BackgroundTransparency = 0.1
+        lbl.Text             = "  " .. text .. "  "
+        lbl.Font             = Enum.Font.GothamBold
+        lbl.TextSize         = 11
+        lbl.TextColor3       = C.ACCENT2
+        lbl.ZIndex           = 4
+        lbl.Parent           = sep
+        local lc = Instance.new("UICorner"); lc.CornerRadius = UDim.new(0,4); lc.Parent = lbl
+    end
+    return sep
+end
+
+local function MakeToggle(title, desc, defaultVal, onChanged)
+    local row = Instance.new("Frame")
+    row.Name             = "Toggle_"..title
+    row.Size             = UDim2.new(1, 0, 0, desc ~= "" and 52 or 40)
+    row.BackgroundColor3 = C.BG2
+    row.BackgroundTransparency = 0.15
+    row.BorderSizePixel  = 0
+    row.ZIndex           = 3
+    row.Parent           = ContentScroll
+    local rc = Instance.new("UICorner"); rc.CornerRadius = UDim.new(0,10); rc.Parent = row
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size            = UDim2.new(1, -58, 0, 20)
+    titleLbl.Position        = UDim2.new(0, 10, 0, desc ~= "" and 6 or 0)
+    titleLbl.AnchorPoint     = desc ~= "" and Vector2.new(0,0) or Vector2.new(0,0.5)
+    if desc == "" then titleLbl.Position = UDim2.new(0,10,0.5,-10) end
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text            = title
+    titleLbl.Font            = Enum.Font.GothamBold
+    titleLbl.TextSize        = 13
+    titleLbl.TextColor3      = C.TEXT
+    titleLbl.TextXAlignment  = Enum.TextXAlignment.Left
+    titleLbl.ZIndex          = 4
+    titleLbl.Parent          = row
+
+    if desc ~= "" then
+        local descLbl = Instance.new("TextLabel")
+        descLbl.Size           = UDim2.new(1, -58, 0, 16)
+        descLbl.Position       = UDim2.new(0, 10, 0, 28)
+        descLbl.BackgroundTransparency = 1
+        descLbl.Text           = desc
+        descLbl.Font           = Enum.Font.Gotham
+        descLbl.TextSize       = 11
+        descLbl.TextColor3     = C.SUBTEXT
+        descLbl.TextXAlignment = Enum.TextXAlignment.Left
+        descLbl.ZIndex         = 4
+        descLbl.Parent         = row
+    end
+
+    -- Toggle pill
+    local pill = Instance.new("Frame")
+    pill.Size             = UDim2.new(0, 40, 0, 22)
+    pill.Position         = UDim2.new(1, -50, 0.5, -11)
+    pill.BackgroundColor3 = defaultVal and C.ACCENT or Color3.fromRGB(50,50,65)
+    pill.BorderSizePixel  = 0
+    pill.ZIndex           = 4
+    pill.Parent           = row
+    local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(1,0); pc.Parent = pill
+
+    local knob = Instance.new("Frame")
+    knob.Size             = UDim2.new(0, 16, 0, 16)
+    knob.Position         = UDim2.new(defaultVal and 1 or 0, defaultVal and -19 or 3, 0.5, -8)
+    knob.BackgroundColor3 = C.WHITE
+    knob.BorderSizePixel  = 0
+    knob.ZIndex           = 5
+    knob.Parent           = pill
+    local kc = Instance.new("UICorner"); kc.CornerRadius = UDim.new(1,0); kc.Parent = knob
+
+    local active = defaultVal
+    local hitbox = Instance.new("TextButton")
+    hitbox.Size              = UDim2.new(1,0,1,0)
+    hitbox.BackgroundTransparency = 1
+    hitbox.Text              = ""
+    hitbox.ZIndex            = 6
+    hitbox.Parent            = row
+
+    hitbox.MouseButton1Click:Connect(function()
+        active = not active
+        Tween(pill, {BackgroundColor3 = active and C.ACCENT or Color3.fromRGB(50,50,65)})
+        Tween(knob, {Position = active and UDim2.new(1,0,-19,0.5,-8) or UDim2.new(0,0,3,0.5,-8)})
+        knob.Position = active and UDim2.new(1,-19,0.5,-8) or UDim2.new(0,3,0.5,-8)
+        if onChanged then onChanged(active) end
+    end)
+
+    return row
+end
+
+local function MakeDropdown(title, options, multi, onChanged)
+    local ITEM_H = 32
+    local open   = false
+    local selected = {}
+
+    local container = Instance.new("Frame")
+    container.Name             = "DD_"..title
+    container.Size             = UDim2.new(1, 0, 0, 40)
+    container.BackgroundTransparency = 1
+    container.BorderSizePixel  = 0
+    container.ZIndex           = 3
+    container.ClipsDescendants = false
+    container.Parent           = ContentScroll
+
+    local header = Instance.new("Frame")
+    header.Size             = UDim2.new(1, 0, 0, 40)
+    header.BackgroundColor3 = C.BG2
+    header.BackgroundTransparency = 0.15
+    header.BorderSizePixel  = 0
+    header.ZIndex           = 5
+    header.Parent           = container
+    local hc = Instance.new("UICorner"); hc.CornerRadius = UDim.new(0,10); hc.Parent = header
+
+    local hTitle = Instance.new("TextLabel")
+    hTitle.Size             = UDim2.new(1,-44,1,0)
+    hTitle.Position         = UDim2.new(0,10,0,0)
+    hTitle.BackgroundTransparency = 1
+    hTitle.Text             = title
+    hTitle.Font             = Enum.Font.GothamBold
+    hTitle.TextSize         = 13
+    hTitle.TextColor3       = C.TEXT
+    hTitle.TextXAlignment   = Enum.TextXAlignment.Left
+    hTitle.ZIndex           = 6
+    hTitle.Parent           = header
+
+    local hArrow = Instance.new("TextLabel")
+    hArrow.Size             = UDim2.new(0,30,1,0)
+    hArrow.Position         = UDim2.new(1,-34,0,0)
+    hArrow.BackgroundTransparency = 1
+    hArrow.Text             = "▾"
+    hArrow.Font             = Enum.Font.GothamBold
+    hArrow.TextSize         = 16
+    hArrow.TextColor3       = C.ACCENT
+    hArrow.ZIndex           = 6
+    hArrow.Parent           = header
+
+    local selLabel = Instance.new("TextLabel")
+    selLabel.Size           = UDim2.new(1,-44,0,14)
+    selLabel.Position       = UDim2.new(0,10,1,-16)
+    selLabel.BackgroundTransparency = 1
+    selLabel.Text           = "None selected"
+    selLabel.Font           = Enum.Font.Gotham
+    selLabel.TextSize       = 10
+    selLabel.TextColor3     = C.SUBTEXT
+    selLabel.TextXAlignment = Enum.TextXAlignment.Left
+    selLabel.ZIndex         = 6
+    selLabel.Parent         = header
+
+    -- Dropdown list (positioned below header inside ContentScroll)
+    local dropList = Instance.new("Frame")
+    dropList.Name           = "DropList"
+    dropList.Size           = UDim2.new(1,0,0, #options * ITEM_H + 6)
+    dropList.Position       = UDim2.new(0,0,0,46)
+    dropList.BackgroundColor3 = Color3.fromRGB(16,16,26)
+    dropList.BackgroundTransparency = 0.05
+    dropList.BorderSizePixel = 0
+    dropList.ZIndex         = 30
+    dropList.Visible        = false
+    dropList.Parent         = container
+    local dlc = Instance.new("UICorner"); dlc.CornerRadius = UDim.new(0,10); dlc.Parent = dropList
+    local dls = Instance.new("UIStroke"); dls.Color = C.ACCENT; dls.Thickness = 1; dls.Transparency = 0.5; dls.Parent = dropList
+
+    local dlLayout = Instance.new("UIListLayout")
+    dlLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    dlLayout.Padding   = UDim.new(0,2)
+    dlLayout.Parent    = dropList
+    local dlPad = Instance.new("UIPadding")
+    dlPad.PaddingLeft  = UDim.new(0,4)
+    dlPad.PaddingRight = UDim.new(0,4)
+    dlPad.PaddingTop   = UDim.new(0,3)
+    dlPad.PaddingBottom = UDim.new(0,3)
+    dlPad.Parent       = dropList
+
+    local function UpdateSelLabel()
+        if #selected == 0 then
+            selLabel.Text = "None selected"
+        elseif #selected == 1 then
+            selLabel.Text = selected[1]
+        else
+            selLabel.Text = #selected .. " selected"
+        end
+    end
+
+    for i, opt in ipairs(options) do
+        local optVal = type(opt) == "table" and opt.Value or opt
+
+        local item = Instance.new("TextButton")
+        item.Name            = "Item_"..i
+        item.Size            = UDim2.new(1, 0, 0, ITEM_H - 4)
+        item.BackgroundColor3 = C.BG3
+        item.BackgroundTransparency = 0.4
+        item.Text            = optVal
+        item.Font            = Enum.Font.Gotham
+        item.TextSize        = 12
+        item.TextColor3      = C.TEXT
+        item.BorderSizePixel = 0
+        item.LayoutOrder     = i
+        item.ZIndex          = 31
+        item.Parent          = dropList
+        local ic = Instance.new("UICorner"); ic.CornerRadius = UDim.new(0,7); ic.Parent = item
+
+        item.MouseButton1Click:Connect(function()
+            if multi then
+                local found = false
+                for idx, v in ipairs(selected) do
+                    if v == optVal then table.remove(selected, idx); found = true; break end
+                end
+                if not found then table.insert(selected, optVal) end
+                item.BackgroundColor3 = (function()
+                    for _, v in ipairs(selected) do if v == optVal then return C.ACCENT end end
+                    return C.BG3
+                end)()
+            else
+                selected = {optVal}
+                for _, ch in ipairs(dropList:GetChildren()) do
+                    if ch:IsA("TextButton") then
+                        ch.BackgroundColor3 = C.BG3
+                        ch.BackgroundTransparency = 0.4
+                    end
+                end
+                item.BackgroundColor3 = C.ACCENT
+                item.BackgroundTransparency = 0.2
+            end
+            UpdateSelLabel()
+            if onChanged then onChanged(selected) end
+        end)
+    end
+
+    local hBtn = Instance.new("TextButton")
+    hBtn.Size              = UDim2.new(1,0,1,0)
+    hBtn.BackgroundTransparency = 1
+    hBtn.Text              = ""
+    hBtn.ZIndex            = 10
+    hBtn.Parent            = header
+
+    hBtn.MouseButton1Click:Connect(function()
+        open = not open
+        dropList.Visible = open
+        container.Size = open and UDim2.new(1,0,0, 40 + 6 + #options * ITEM_H) or UDim2.new(1,0,0,40)
+        hArrow.Text = open and "▴" or "▾"
+    end)
+
+    return container, function() return selected end
+end
+
+-- ============================================================
+--  BUILD TABS
+-- ============================================================
+
+-- We'll store references to toggle containers per tab
+local MainTabItems = {}
+local EspTabItems  = {}
+
+local function ClearContent()
+    for _, c in ipairs(ContentScroll:GetChildren()) do
+        if c:IsA("Frame") or c:IsA("ScrollingFrame") then c:Destroy() end
+    end
+end
+
+-- We build once and show/hide
+local function BuildMainTab()
+    -- Separator: Main
+    MakeSeparator("Main")
+
+    -- Berry Dropdown
+    local berryTypes = GetPresentBerryTypes()
+    if #berryTypes == 0 then berryTypes = BERRY_NAMES end -- fallback: show all
+
+    local berryDD, getBerrySelected = MakeDropdown("Select Berry Target", berryTypes, false, function(sel)
+        State.SelectedBerry = sel[1] or nil
+    end)
+
+    -- Tween to Berry Toggle
+    MakeToggle("Tween To Berry", "Auto tween to selected/closest berry", false, function(v)
+        State.TweenToBerry = v
+    end)
+
+    -- Collect Berry Toggle
+    MakeToggle("Auto Collect Berry", "Auto collect selected/closest berry", false, function(v)
+        State.CollectBerry = v
+    end)
+
+    MakeSeparator("Sword Dealer")
+
+    -- Tp to Sword Dealer Toggle
+    MakeToggle("Tp to Sword Dealer", "Teleport when dealer is present", false, function(v)
+        State.TpSwordDealer = v
+    end)
+
+    MakeSeparator("Travel")
+
+    -- Island Teleport Dropdown
+    local sea = GetCurrentSea()
+    local islandList = sea == 3 and SEA3_ISLANDS or SEA2_ISLANDS
+    local islandNames = {}
+    for k in pairs(islandList) do table.insert(islandNames, k) end
+    table.sort(islandNames)
+
+    local islandDD, getIslandSel = MakeDropdown("Teleport to Island", islandNames, false, function(sel)
+        State.SelectedIsland = sel[1] or nil
+        if State.SelectedIsland then
+            local pos = islandList[State.SelectedIsland]
+            if pos then TweenToPosition(pos) end
+        end
+    end)
+end
+
+local function BuildEspTab()
+    MakeSeparator("Esp")
+
+    MakeToggle("ESP Berries", "Show berry ESP on screen", false, function(v)
+        State.EspBerry = v
+        if not v then
+            for _, lbl in pairs(State.EspLabels) do lbl:Destroy() end
+            State.EspLabels = {}
+        end
+    end)
+
+    MakeToggle("ESP Sword Dealer", "Show dealer ESP on screen", false, function(v)
+        State.EspSwordDealer = v
+        if not v then
+            for _, lbl in pairs(State.DealerEspLabels) do lbl:Destroy() end
+            State.DealerEspLabels = {}
+        end
+    end)
+end
+
+local function SwitchTab(name)
+    ClearContent()
+    SetActiveTab(name)
+    if name == "Main" then
+        BuildMainTab()
+    else
+        BuildEspTab()
+    end
+end
+
+TabMain.MouseButton1Click:Connect(function() SwitchTab("Main") end)
+TabEsp.MouseButton1Click:Connect(function() SwitchTab("Esp") end)
+
+-- Initial build
+SwitchTab("Main")
+SetActiveTab("Main")
+
+-- ============================================================
+--  CLOSE / MINIMIZE LOGIC
+-- ============================================================
+
+CloseBtn.MouseButton1Click:Connect(function()
+    WarnPopup.Visible = true
+end)
+
+WarnYes.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+WarnNo.MouseButton1Click:Connect(function()
+    WarnPopup.Visible = false
+end)
+
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    Tween(ContentScroll, {Size = minimized and UDim2.new(1,-8,0,0) or UDim2.new(1,-8,1,-96)})
+    Tween(MainFrame,     {Size = minimized and UDim2.new(0,UIW,0,94) or UDim2.new(0,UIW,0,UIH)})
+    MinBtn.Text = minimized and "+" or "−"
+end)
+
+-- ============================================================
+--  MOVEABLE CIRCLE TOGGLE BUTTON
+-- ============================================================
+local CircleBtn = Instance.new("TextButton")
+CircleBtn.Name             = "CircleToggle"
+CircleBtn.Size             = UDim2.new(0, 50, 0, 50)
+CircleBtn.Position         = UDim2.new(0, 10, 0.82, 0)
+CircleBtn.BackgroundColor3 = C.ACCENT
+CircleBtn.Text             = "R"
+CircleBtn.Font             = Enum.Font.GothamBold
+CircleBtn.TextSize         = 20
+CircleBtn.TextColor3       = C.WHITE
+CircleBtn.BorderSizePixel  = 0
+CircleBtn.ZIndex           = 100
+CircleBtn.Parent           = ScreenGui
+local CCorner = Instance.new("UICorner"); CCorner.CornerRadius = UDim.new(1,0); CCorner.Parent = CircleBtn
+local CStroke = Instance.new("UIStroke"); CStroke.Color = C.ACCENT2; CStroke.Thickness = 2.5; CStroke.Parent = CircleBtn
+
+-- Glow effect
+local CGlow = Instance.new("Frame")
+CGlow.Size             = UDim2.new(1.6, 0, 1.6, 0)
+CGlow.Position         = UDim2.new(-0.3, 0, -0.3, 0)
+CGlow.BackgroundColor3 = C.ACCENT
+CGlow.BackgroundTransparency = 0.75
+CGlow.BorderSizePixel  = 0
+CGlow.ZIndex           = 99
+CGlow.Parent           = CircleBtn
+local CGlowC = Instance.new("UICorner"); CGlowC.CornerRadius = UDim.new(1,0); CGlowC.Parent = CGlow
+
+-- Drag logic for circle
+local dragging, dragStart, startPos = false, nil, nil
+
+CircleBtn.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+        dragging  = true
+        dragStart = inp.Position
+        startPos  = CircleBtn.Position
+    end
+end)
+
+CircleBtn.InputEnded:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(inp)
+    if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+        local delta = inp.Position - dragStart
+        CircleBtn.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+local clickTimer = 0
+CircleBtn.MouseButton1Click:Connect(function()
+    local now = tick()
+    if now - clickTimer < 0.3 then return end -- debounce
+    clickTimer = now
+    State.UIVisible = not State.UIVisible
+    MainFrame.Visible = State.UIVisible
+    CircleBtn.Text = State.UIVisible and "R" or "▶"
+end)
+
+-- ============================================================
+--  MAIN FRAME DRAG
+-- ============================================================
+local draggingMain, dragStartMain, startPosMain = false, nil, nil
+
+TitleBar.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+        draggingMain  = true
+        dragStartMain = inp.Position
+        startPosMain  = MainFrame.Position
+    end
+end)
+
+TitleBar.InputEnded:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.MouseButton1 or inp.UserInputType == Enum.UserInputType.Touch then
+        draggingMain = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(inp)
+    if draggingMain and (inp.UserInputType == Enum.UserInputType.MouseMovement or inp.UserInputType == Enum.UserInputType.Touch) then
+        local delta = inp.Position - dragStartMain
+        MainFrame.Position = UDim2.new(
+            startPosMain.X.Scale, startPosMain.X.Offset + delta.X,
+            startPosMain.Y.Scale, startPosMain.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- ============================================================
+--  ESP SYSTEM
+-- ============================================================
+
+local function UpdateBerryESP()
+    -- Remove stale labels
+    local validParts = {}
+    local berries = FindBerryModels(State.SelectedBerry)
+    for _, b in ipairs(berries) do
+        validParts[b.part] = true
+    end
+
+    for part, lbl in pairs(State.EspLabels) do
+        if not part.Parent or not part.Parent.Parent then
+            lbl:Destroy()
+            State.EspLabels[part] = nil
+        end
+    end
+
+    for _, b in ipairs(berries) do
+        local part = b.part
+        local sPos, vis, depth = WorldToViewport(part.Position)
+        if not State.EspLabels[part] then
+            -- Create new label
+            local lbl = Instance.new("BillboardGui")
+            lbl.Size          = UDim2.new(0, 120, 0, 30)
+            lbl.StudsOffset   = Vector3.new(0, 3, 0)
+            lbl.AlwaysOnTop   = true
+            lbl.Adornee       = part
+            lbl.Parent        = ScreenGui
+
+            local text = Instance.new("TextLabel")
+            text.Size              = UDim2.new(1,0,1,0)
+            text.BackgroundColor3  = Color3.fromRGB(0,0,0)
+            text.BackgroundTransparency = 0.5
+            text.Text              = b.model.Name
+            text.Font              = Enum.Font.GothamBold
+            text.TextSize          = 11
+            text.TextColor3        = C.GREEN
+            text.TextStrokeTransparency = 0.3
+            text.ZIndex            = 50
+            text.Parent            = lbl
+            local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(0,4); tc.Parent = text
+
+            State.EspLabels[part] = lbl
+        end
+
+        -- Update distance
+        local hrp = GetHRP()
+        if hrp and State.EspLabels[part] then
+            local dist = math.floor((part.Position - hrp.Position).Magnitude)
+            local tl   = State.EspLabels[part]:FindFirstChildWhichIsA("TextLabel")
+            if tl then
+                tl.Text = b.model.Name .. "\n[" .. dist .. " studs]"
+                tl.Visible = vis and depth > 0
+            end
+        end
+    end
+end
+
+local function UpdateDealerESP()
+    local dealer = FindSwordDealer()
+    if not dealer then
+        for _, lbl in pairs(State.DealerEspLabels) do lbl:Destroy() end
+        State.DealerEspLabels = {}
+        return
+    end
+
+    local hrp_d = dealer:FindFirstChild("HumanoidRootPart") or dealer:FindFirstChildWhichIsA("BasePart")
+    if not hrp_d then return end
+
+    if not State.DealerEspLabels[dealer] then
+        local lbl = Instance.new("BillboardGui")
+        lbl.Size          = UDim2.new(0, 160, 0, 40)
+        lbl.StudsOffset   = Vector3.new(0, 5, 0)
+        lbl.AlwaysOnTop   = true
+        lbl.Adornee       = hrp_d
+        lbl.Parent        = ScreenGui
+
+        local text = Instance.new("TextLabel")
+        text.Size              = UDim2.new(1,0,1,0)
+        text.BackgroundColor3  = Color3.fromRGB(0,0,0)
+        text.BackgroundTransparency = 0.4
+        text.Text              = "⚔ Legendary Sword Dealer"
+        text.Font              = Enum.Font.GothamBold
+        text.TextSize          = 11
+        text.TextColor3        = Color3.fromRGB(255, 215, 0)
+        text.TextStrokeTransparency = 0.3
+        text.ZIndex            = 50
+        text.Parent            = lbl
+        local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(0,4); tc.Parent = text
+
+        State.DealerEspLabels[dealer] = lbl
+    end
+
+    local hrp = GetHRP()
+    if hrp then
+        local dist = math.floor((hrp_d.Position - hrp.Position).Magnitude)
+        local tl   = State.DealerEspLabels[dealer]:FindFirstChildWhichIsA("TextLabel")
+        if tl then
+            tl.Text = "⚔ Legendary Sword Dealer\n[" .. dist .. " studs]"
+        end
+    end
+end
+
+-- ============================================================
+--  MAIN LOOP (Auto-Features)
+-- ============================================================
+
+local tweenCooldown  = 0
+local collectCooldown = 0
+
+RunService.Heartbeat:Connect(function()
+    local now  = tick()
+    local hrp  = GetHRP()
+
+    -- ---- BERRY TWEEN ----
+    if State.TweenToBerry and hrp and now - tweenCooldown > 2 then
+        tweenCooldown = now
+        local berries = FindBerryModels(State.SelectedBerry)
+        if berries[1] then
+            TweenToPosition(berries[1].part.Position)
+        end
+    end
+
+    -- ---- BERRY COLLECT ----
+    if State.CollectBerry and hrp and now - collectCooldown > 0.5 then
+        collectCooldown = now
+        local berries = FindBerryModels(State.SelectedBerry)
+        for _, b in ipairs(berries) do
+            local dist = (b.part.Position - hrp.Position).Magnitude
+            if dist < 10 then
+                -- Touch/collect the berry
+                hrp.CFrame = CFrame.new(b.part.Position)
+                break
+            end
+        end
+        -- Also tween to closest
+        if berries[1] then
+            TweenToPosition(berries[1].part.Position)
+        end
+    end
+
+    -- ---- SWORD DEALER TP ----
+    if State.TpSwordDealer and hrp then
+        local dealer = FindSwordDealer()
+        if dealer then
+            local dhrp = dealer:FindFirstChild("HumanoidRootPart") or dealer:FindFirstChildWhichIsA("BasePart")
+            if dhrp then
+                local dist = (dhrp.Position - hrp.Position).Magnitude
+                if dist > 15 then
+                    TweenToPosition(dhrp.Position + Vector3.new(4,0,0))
+                end
+            end
+        end
+    end
+
+    -- ---- ESP UPDATES ----
+    if State.EspBerry then
+        UpdateBerryESP()
+    end
+    if State.EspSwordDealer then
+        UpdateDealerESP()
+    end
+end)
+
+-- ============================================================
+--  PRINT LOADED
+-- ============================================================
+print("⚡ Rexy Hub Loaded | Blox Fruits | by Rexy")
